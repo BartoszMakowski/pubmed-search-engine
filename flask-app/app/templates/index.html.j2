@@ -1,0 +1,8 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<form action="" method="post" name="search">
+    {{ form.hidden_tag() }}
+    {{ form.search_phrase }}
+    <p><input type="submit" value="Szukaj"></p>
+</form>
+{% endblock %}

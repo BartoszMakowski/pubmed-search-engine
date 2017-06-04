@@ -17,6 +17,7 @@ from java.io import StringReader
 
 from org.apache.lucene.store import SimpleFSDirectory
 from java.nio.file import Paths
+import xml.etree.ElementTree as ET
 
 
 class MyAnalyzer(StandardAnalyzer):
@@ -110,12 +111,24 @@ def calc_idf(ind_searcher, hits, phrase):
     return (idf)
 
 
-def index_articles():
+# TODO:
+#   - upload files in secure way
+#   - index author field
+def index_articles(data_file):
     vm_env = lucene.getVMEnv()
     vm_env.attachCurrentThread()
+    tree = ET.parse(data_file)
+    root = tree.getroot()
     doc = Document()
     path = Paths.get('var/index')
     ind_dir = SimpleFSDirectory(path)
     conf = IndexWriterConfig(StandardAnalyzer())
     ind_wr = IndexWriter(ind_dir, conf)
+    for pmed_article in root.findall('PubmedArticle'):
+        article = pmed_article.find('MedlineCitation').find('Article')
+        if article is not None and article.find('Abstract') is not None:
+            doc = Document()
+            doc.add(TextField('title', article.find('ArticleTitle').text, Field.Store.YES))
+            doc.add(TextField('abstract', article.find('Abstract').find('AbstractText').text, Field.Store.YES))
+            ind_wr.addDocument(doc)
     ind_wr.close()

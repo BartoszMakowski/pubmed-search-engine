@@ -1,0 +1,8 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<form action="" method="post" name="upload" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    {{ form.file }}
+    <p><input type="submit" value="Wyślij i zaindeksuj"></p>
+</form>
+{% endblock %}

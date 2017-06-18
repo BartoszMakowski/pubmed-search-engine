@@ -1,12 +1,13 @@
 import lucene
 from builtins import print
+import math
 
 from math import log
 from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.index import IndexReader, DirectoryReader
 from org.apache.lucene.search import IndexSearcher
 from org.apache.lucene.queryparser.classic import QueryParser
-from org.apache.lucene.document import Document, TextField, Field
+from org.apache.lucene.document import Document, TextField, Field, StringField
 from org.apache.lucene.index import IndexWriter, IndexWriterConfig
 
 from org.apache.lucene.analysis.standard import StandardTokenizer
@@ -20,14 +21,6 @@ from java.nio.file import Paths
 import xml.etree.ElementTree as ET
 
 
-class MyAnalyzer(StandardAnalyzer):
-    def __init__(self):
-        super().__init__()
-
-    def createComponents(fieldName):
-        print("WYWOŁANO")
-
-
 def my_tokenizer(phrase):
     es = EnglishStemmer()
     stok = StandardTokenizer()
@@ -39,7 +32,7 @@ def my_tokenizer(phrase):
     while sfil.incrementToken():
         es.setCurrent(str(sfil.getAttribute(CharTermAttribute.class_)))
         es.stem()
-        results = results + ' ' + es.getCurrent()
+        results = results + ' ' + es.getCurrent().lower()
     return (results)
 
 
@@ -53,46 +46,77 @@ def search(phrase):
     ind_reader = DirectoryReader.open(index_dir)
     ind_searcher = IndexSearcher(ind_reader)
     query_parser = QueryParser('abstract', StandardAnalyzer())
-    tokens = my_tokenizer(phrase)
-    query = query_parser.parse(tokens)
+    query_terms = my_tokenizer(phrase)
+    query_tf = calc_tf(phrase)
+
+    query = query_parser.parse(query_terms)
     print(query)
     hits = ind_searcher.search(query, 100)
     print(str(hits.totalHits) + " documents found.")
     arts = []
     idf = calc_idf(ind_searcher, hits, phrase)
+
+    query_tfidf = idf.copy()
+    for token, val in query_tfidf.items():
+        query_tfidf[token] = val * query_tf.get(token, 0)
+        print(token + ': ' + str(query_tfidf[token]))
+
+    sum_dl = 0
+    doc_words_num = {}
+    for score_doc in hits.scoreDocs:
+        doc_len = len(my_tokenizer(ind_searcher.doc(score_doc.doc).getField('abstract').stringValue()).split())
+        sum_dl += doc_len
+        doc_words_num[str(score_doc.doc)] = doc_len
+    avg_dl = sum_dl / len(hits.scoreDocs)
+    print(avg_dl)
+
     for score_doc in hits.scoreDocs:
         # print(score_doc.score)
-        tf_sum, tf = calc_tf(ind_searcher.doc(score_doc.doc).getField('abstract').stringValue(), phrase)
-        tfidf = tf.copy()
-        tfidf_sum = 0
-        for token, val in tfidf.items():
-            tfidf[token] = val * idf[token]
-            tfidf_sum += tfidf[token]
+        doc_tf = calc_tf(ind_searcher.doc(score_doc.doc).getField('abstract').stringValue())
+        doc_tfidf = idf.copy()
+        # tfidf_sum = 0
+        for token, val in doc_tfidf.items():
+            doc_tfidf[token] = val * doc_tf.get(token, 0)
+        tfidf_cos_sim = round(calc_cosine_similarity(query_tfidf, doc_tfidf), 3)
+        tf_cos_sim = round(calc_cosine_similarity(query_tf, doc_tf), 3)
+        rel = (tf_cos_sim + 3*tfidf_cos_sim)/4
+        rel = round(rel, 3)
+        doc_bm25 = calc_bm25(idf, avg_dl, doc_tf, doc_words_num[str(score_doc.doc)])
         arts.append({ \
+            'rel': rel, \
             'title': ind_searcher.doc(score_doc.doc).getField('title').stringValue(), \
+            # 'pmid': ind_searcher.doc(score_doc.doc).getField('pmid').stringValue(), \
+            # 'authors': ind_searcher.doc(score_doc.doc).getField('authors').stringValue(), \
             'id': score_doc.doc, \
-            'score': score_doc.score, \
-            'tf': tf_sum, \
-            'tfidf': tfidf_sum})
+            'score': round(score_doc.score, 3), \
+            'tf': doc_tf, \
+            'tfidf': doc_tfidf, \
+            'bm25': doc_bm25, \
+            'tf_cos_sim': tf_cos_sim, \
+            'tfidf_cos_sim': tfidf_cos_sim})
     # for art in arts:
     #     print(str.split(my_tokenizer(art)))
-    return (arts, tokens)
+    return (arts, query_terms)
 
 
-def calc_tf(article, phrase):
+def calc_bm25(idf, avg_dl, doc_tf, doc_words, k = 1.5, b=0.75):
+    score = 0
+    for token, val in idf.items():
+        score += val * (doc_tf.get(token, 0) * (k + 1))/(doc_tf.get(token, 0) + (k * ((1 - b) + (b * doc_words/avg_dl))))
+    return (score)
+
+
+
+def calc_tf(article):
     tf = {}
-    counter = 0
-    tokens = str.split(my_tokenizer(phrase))
-    for token in tokens:
-        tf[token] = 0
     article = str.split(my_tokenizer(article))
     for word in article:
-        # print(">>>" + word + "<<<")
-        if word in tokens:
-            counter = counter + 1
-            tf[word] = tf[word] + 1
-    tf_sum = counter / len(article)
-    return (tf_sum, tf)
+        tf[word] = 0
+    for word in article:
+        tf[word] = tf[word] + 1
+    total = len(article)
+    tf = {k: v / total for k, v in tf.items()}
+    return (tf)
 
 
 def calc_idf(ind_searcher, hits, phrase):
@@ -111,6 +135,19 @@ def calc_idf(ind_searcher, hits, phrase):
     return (idf)
 
 
+def calc_cosine_similarity(query, doc):
+    dot_prod = 0
+    query_vec_len = 0
+    doc_vec_len = 0
+    for term in query:
+        dot_prod += query[term] * doc.get(term, 0)
+        query_vec_len += query[term]**2
+        doc_vec_len += doc.get(term, 0)**2
+    query_vec_len = math.sqrt(query_vec_len)
+    doc_vec_len = math.sqrt(doc_vec_len)
+    cos_sim = dot_prod/(query_vec_len * doc_vec_len)
+    return (cos_sim)
+
 # TODO:
 #   - upload files in secure way
 #   - index author field
@@ -125,10 +162,19 @@ def index_articles(data_file):
     conf = IndexWriterConfig(StandardAnalyzer())
     ind_wr = IndexWriter(ind_dir, conf)
     for pmed_article in root.findall('PubmedArticle'):
+        pmid = pmed_article.find('MedlineCitation').find('PMID').text
         article = pmed_article.find('MedlineCitation').find('Article')
         if article is not None and article.find('Abstract') is not None:
             doc = Document()
+            doc.add(StringField('pmid', pmid, Field.Store.YES))
             doc.add(TextField('title', article.find('ArticleTitle').text, Field.Store.YES))
             doc.add(TextField('abstract', article.find('Abstract').find('AbstractText').text, Field.Store.YES))
+            author_list = article.find('AuthorList')
+            authors = ''
+            # if author_list is not None:
+            #     for author in author_list.findall('Author'):
+            #         author = author + str(author.find('ForeName').text) + ' '
+            #         author = author + str(author.find('LastName').text) + ' '
+            # doc.add(TextField('authors', authors, Field.Store.YES))
             ind_wr.addDocument(doc)
     ind_wr.close()

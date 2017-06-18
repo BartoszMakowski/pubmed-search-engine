@@ -9,13 +9,27 @@
     <meta name="description" content="Wyszukiwarka artykułów medycznych">
     <meta name="author" content="Bartosz Makowski">
 
-    <link rel="stylesheet" href="css/styles.css?v=1.0">
+    <link rel="stylesheet" href="static/css/styles.css?v=1.0">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="static/jquery.tablesorter.js"></script>
 </head>
 
 <body>
+<div class="contianer">
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="#">Wyszukiwartka artykułów medycznych</a>
+    </div>
+    <ul class="nav navbar-nav">
+      <li><a href="search">Wyszukiwanie artykułów</a></li>
+      <li><a href="add">Aktualizacja bazy</a></li>
+    </ul>
+  </div>
+</nav>
+    </div>
 {% block content %}{% endblock %}
 
 </body>

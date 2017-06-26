@@ -1,8 +1,24 @@
 {% extends "base.html.j2" %}
 {% block content %}
+<div class="container">
+<div class="col-lg-2"></div>
 <form action="" method="post" name="upload" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
-    {{ form.file }}
-    <p><input type="submit" value="Wyślij i zaindeksuj"></p>
+    <div class="col-lg-6">
+    {{ form.file(class="form-control") }}
+    </div>
+    <div class="col-lg-2">
+    <p><input class="btn" type="submit" value="Wyślij i zaindeksuj"></p>
+    </div>
 </form>
+    </div>
+{%- if alert %}
+<div class="container">
+    <div class="col-lg-2"></div>
+    <div class="col-lg-8">
+    <div class="alert alert-success" role="alert">{{ alert }}</div>
+    </div>
+</div>
+{%- endif %}
+<!--</div>-->
 {% endblock %}

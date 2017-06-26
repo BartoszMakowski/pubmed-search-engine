@@ -98,6 +98,22 @@ def search(phrase):
     #     print(str.split(my_tokenizer(art)))
     return (arts, query_terms)
 
+def find_by_id(id):
+    vm_env = lucene.getVMEnv()
+    vm_env.attachCurrentThread()
+
+    index_path = Paths.get('var/index')
+    index_dir = SimpleFSDirectory(index_path)
+    # print(str(index_dir))
+    ind_reader = DirectoryReader.open(index_dir)
+    doc = ind_reader.document(id)
+    article = { \
+        'pmid': doc.getField('pmid').stringValue(), \
+        'authors': doc.getField('authors').stringValue(), \
+        'title': doc.getField('title').stringValue(), \
+        'abstract': doc.getField('abstract').stringValue()}
+    return(article)
+
 
 def calc_bm25(idf, avg_dl, doc_tf, doc_words, k = 1.5, b=0.75):
     score = 0

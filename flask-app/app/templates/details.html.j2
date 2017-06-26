@@ -1,0 +1,15 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<div class="container">
+    <div class="col-lg-1"></div>
+    <div class="col-lg-10">
+        <h3> Autor:</h3> <h4>{{ article.authors }}</h4>
+        <h3> Tytuł:</h3> <h4>{{ article.title }}</h4>
+        <h3> Streszczenie:</h3> <p>{{ article.abstract }}</p>
+        <hr/>
+        <h3><a href="https://www.ncbi.nlm.nih.gov/pubmed/{{ article.pmid }}">Artykuł na stronie PubMed</a></h3>
+
+    </div>
+</div>
+
+{% endblock %}

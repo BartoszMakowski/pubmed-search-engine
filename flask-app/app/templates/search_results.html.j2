@@ -36,8 +36,8 @@
         <th>ID</th>
         <th>Tytuł</th>
         <th>Punkty Lucene</th>
-        <th>TF cos</th>
-        <th>TF-IDF cos</th>
+        <th>TF-IDF_w1 cos</th>
+        <th>TF-IDF_w2 cos</th>
         <th>BM25</th>
     </tr>
     </thead>
@@ -48,8 +48,8 @@
         <td>{{ art.id }}</td>
         <td><a href="article/{{ art.id }}"> {{ art.title }}</a></td>
         <td>{{ art.score }}</td>
-        <td>{{ art.tf_cos_sim }}</td>
         <td>{{ art.tfidf_cos_sim }}</td>
+        <td>{{ art.tfidf1_cos_sim }}</td>
         <td>{{ art.bm25 }}</td>
     </tr>
     {%- endfor %}

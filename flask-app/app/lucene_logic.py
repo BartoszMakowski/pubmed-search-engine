@@ -34,8 +34,31 @@ def my_tokenizer(phrase):
     while sfil.incrementToken():
         es.setCurrent(str(sfil.getAttribute(CharTermAttribute.class_)))
         es.stem()
-        results = results + ' ' + es.getCurrent().lower()
+        next_token = es.getCurrent().lower()
+        try:
+            int(next_token)
+        except:
+            results = results + ' ' + next_token
     return (results)
+
+def weights_from_phrase(phrase):
+    es = EnglishStemmer()
+    stok = StandardTokenizer()
+    sread = StringReader(str(phrase))
+    stok.setReader(sread)
+    stok.reset()
+    weights = {}
+    sfil = StopFilter(stok, StandardAnalyzer.ENGLISH_STOP_WORDS_SET)
+    while sfil.incrementToken():
+        es.setCurrent(str(sfil.getAttribute(CharTermAttribute.class_)))
+        es.stem()
+        next_token = es.getCurrent().lower()
+        try:
+            weight = int(next_token)
+            weights[last_token] = int(weight)
+        except:
+            last_token = next_token
+    return (weights)
 
 
 def search(phrase):
@@ -49,6 +72,7 @@ def search(phrase):
     ind_searcher = IndexSearcher(ind_reader)
     query_parser = QueryParser('abstract', StandardAnalyzer())
     query_terms = my_tokenizer(phrase)
+    weights = weights_from_phrase(phrase)
     query_tf, query_tfa = calc_tf_tfa(phrase)
 
     query = query_parser.parse(query_terms)
@@ -79,12 +103,12 @@ def search(phrase):
         # tfidf_sum = 0
         for token, val in doc_tfidf.items():
             doc_tfidf[token] = val * doc_tf.get(token, 0)
-        tfidf_cos_sim = round(calc_cosine_similarity(query_tfidf, doc_tfidf), 3)
-        tfidf1_cos_sim = round(calc_cosine_similarity(idf1, doc_tf), 3)
+        tfidf_cos_sim = round(calc_cosine_similarity(query_tfidf, doc_tfidf, weights), 3)
+        tfidf1_cos_sim = round(calc_cosine_similarity(idf1, doc_tf, weights), 3)
 
         tf_cos_sim = round(calc_cosine_similarity(query_tf, doc_tf), 3)
         rel = tfidf_cos_sim
-        doc_bm25 = calc_bm25(idf, avg_dl, doc_tf, doc_words_num[str(score_doc.doc)])
+        doc_bm25 = calc_bm25(idf, avg_dl, doc_tf, doc_words_num[str(score_doc.doc)], weights=weights)
         arts.append({ \
             'rel': rel, \
             'title': ind_searcher.doc(score_doc.doc).getField('title').stringValue(), \
@@ -111,7 +135,7 @@ def find_by_id(id):
     # print(str(index_dir))
     ind_reader = DirectoryReader.open(index_dir)
     doc = ind_reader.document(id)
-    print(doc.getField('authors').stringValue() + 'test')
+    # print(doc.getField('authors').stringValue())
     article = { \
         'pmid': doc.getField('pmid').stringValue(), \
         'authors': doc.getField('authors').stringValue(), \
@@ -120,10 +144,10 @@ def find_by_id(id):
     return(article)
 
 
-def calc_bm25(idf, avg_dl, doc_tf, doc_words, k = 1.5, b=0.75):
+def calc_bm25(idf, avg_dl, doc_tf, doc_words, k = 1.5, b=0.75, weights={}):
     score = 0
     for token, val in idf.items():
-        score += val * (doc_tf.get(token, 0) * (k + 1))/(doc_tf.get(token, 0) + (k * ((1 - b) + (b * doc_words/avg_dl))))
+        score += weights.get(token, 1) * val * (doc_tf.get(token, 0) * (k + 1))/(doc_tf.get(token, 0) + (k * ((1 - b) + (b * doc_words/avg_dl))))
     return (score)
 
 
@@ -167,17 +191,20 @@ def calc_idf(ind_searcher, hits, phrase):
     return (idf, idf1)
 
 
-def calc_cosine_similarity(query, doc):
+def calc_cosine_similarity(query, doc, weights={}):
     dot_prod = 0
     query_vec_len = 0
     doc_vec_len = 0
     for term in query:
-        dot_prod += query[term] * doc.get(term, 0)
-        query_vec_len += query[term]**2
-        doc_vec_len += doc.get(term, 0)**2
+        dot_prod +=  weights.get(term, 1) * query[term] * doc.get(term, 0)
+        query_vec_len +=  weights.get(term, 1) * query[term]**2
+        doc_vec_len +=  weights.get(term, 1) * doc.get(term, 0)**2
     query_vec_len = math.sqrt(query_vec_len)
     doc_vec_len = math.sqrt(doc_vec_len)
-    cos_sim = dot_prod/(query_vec_len * doc_vec_len)
+    if doc_vec_len>0 and query_vec_len>0:
+        cos_sim = dot_prod/(query_vec_len * doc_vec_len)
+    else:
+        cos_sim = 0
     return (cos_sim)
 
 # TODO:
@@ -209,7 +236,7 @@ def index_articles(data_file):
                         if author.find('ForeName') is not None:
                             authors += author.find('ForeName').text + '. '
                         authors +=  author.find('LastName').text + ', '
-            print(authors)
+            # print(authors)
             doc.add(TextField('authors', authors, Field.Store.YES))
             ind_wr.addDocument(doc)
     ind_wr.close()

@@ -171,10 +171,11 @@ def index_articles(data_file):
             doc.add(TextField('abstract', article.find('Abstract').find('AbstractText').text, Field.Store.YES))
             author_list = article.find('AuthorList')
             authors = ''
-            # if author_list is not None:
-            #     for author in author_list.findall('Author'):
-            #         author = author + str(author.find('ForeName').text) + ' '
-            #         author = author + str(author.find('LastName').text) + ' '
-            # doc.add(TextField('authors', authors, Field.Store.YES))
+            if author_list is not None:
+                for author in author_list.findall('Author'):
+                    if author.find('LastName'):
+                        authors += author.find('ForeName').text + '. '
+                        authors +=  author.find('LastName').text + ', '
+            doc.add(TextField('authors', authors, Field.Store.YES))
             ind_wr.addDocument(doc)
     ind_wr.close()

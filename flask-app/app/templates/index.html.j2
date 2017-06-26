@@ -1,8 +1,23 @@
 {% extends "base.html.j2" %}
 {% block content %}
-<form action="" method="post" name="search">
-    {{ form.hidden_tag() }}
-    {{ form.search_phrase }}
-    <p><input type="submit" value="Szukaj"></p>
-</form>
+
+<div class="col-lg-3"></div>
+<div class="col-lg-6">
+    <form action="" method="post" name="search">
+    <div class="input-group">
+        {{ form.hidden_tag() }}
+      <!--<input type="text" class="form-control" >-->
+        {{ form.search_phrase(class="form-control", placeholder="Wpisz frazę do wyszukania") }}
+      <span class="input-group-btn">
+        <button class="btn btn-default" type="submit">Szukaj!</button>
+      </span>
+    </div><!-- /input-group -->
+        </form>
+  </div>
+
+
+
+    <!--{{ form.search_phrase(class="form-control") }}-->
+    <!--<p><input type="submit" value="Szukaj"></p>-->
+
 {% endblock %}

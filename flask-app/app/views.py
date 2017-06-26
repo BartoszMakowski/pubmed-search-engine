@@ -2,7 +2,7 @@ from app import app
 from .forms import SearchArtForm, AddDataForm
 from flask import render_template, request
 from flask_wtf import Form
-from .lucene_logic import search, index_articles, my_tokenizer
+from .lucene_logic import search, index_articles, find_by_id
 from werkzeug.utils import secure_filename
 import os
 
@@ -17,6 +17,11 @@ def index():
         return render_template('search_results.html.j2', form=form, articles=arts, tokens=tokens.split())
     return render_template('index.html.j2', form=form)
 
+
+@app.route('/article/<id>', methods=['GET'])
+def article_info(id):
+    article = find_by_id(int(id))
+    return render_template('details.html.j2', article=article)
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_data():

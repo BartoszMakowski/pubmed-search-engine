@@ -20,6 +20,8 @@ from org.apache.lucene.store import SimpleFSDirectory
 from java.nio.file import Paths
 import xml.etree.ElementTree as ET
 
+from wheel.test.test_basic import test_findable
+
 
 def my_tokenizer(phrase):
     es = EnglishStemmer()
@@ -47,18 +49,18 @@ def search(phrase):
     ind_searcher = IndexSearcher(ind_reader)
     query_parser = QueryParser('abstract', StandardAnalyzer())
     query_terms = my_tokenizer(phrase)
-    query_tf = calc_tf(phrase)
+    query_tf, query_tfa = calc_tf_tfa(phrase)
 
     query = query_parser.parse(query_terms)
     print(query)
     hits = ind_searcher.search(query, 100)
     print(str(hits.totalHits) + " documents found.")
     arts = []
-    idf = calc_idf(ind_searcher, hits, phrase)
+    idf, idf1 = calc_idf(ind_searcher, hits, phrase)
 
     query_tfidf = idf.copy()
     for token, val in query_tfidf.items():
-        query_tfidf[token] = val * query_tf.get(token, 0)
+        query_tfidf[token] = val * query_tfa.get(token, 0)
         print(token + ': ' + str(query_tfidf[token]))
 
     sum_dl = 0
@@ -72,15 +74,16 @@ def search(phrase):
 
     for score_doc in hits.scoreDocs:
         # print(score_doc.score)
-        doc_tf = calc_tf(ind_searcher.doc(score_doc.doc).getField('abstract').stringValue())
+        doc_tf, doc_tfa = calc_tf_tfa(ind_searcher.doc(score_doc.doc).getField('abstract').stringValue())
         doc_tfidf = idf.copy()
         # tfidf_sum = 0
         for token, val in doc_tfidf.items():
             doc_tfidf[token] = val * doc_tf.get(token, 0)
         tfidf_cos_sim = round(calc_cosine_similarity(query_tfidf, doc_tfidf), 3)
+        tfidf1_cos_sim = round(calc_cosine_similarity(idf1, doc_tf), 3)
+
         tf_cos_sim = round(calc_cosine_similarity(query_tf, doc_tf), 3)
-        rel = (tf_cos_sim + 3*tfidf_cos_sim)/4
-        rel = round(rel, 3)
+        rel = tfidf_cos_sim
         doc_bm25 = calc_bm25(idf, avg_dl, doc_tf, doc_words_num[str(score_doc.doc)])
         arts.append({ \
             'rel': rel, \
@@ -93,7 +96,8 @@ def search(phrase):
             'tfidf': doc_tfidf, \
             'bm25': doc_bm25, \
             'tf_cos_sim': tf_cos_sim, \
-            'tfidf_cos_sim': tfidf_cos_sim})
+            'tfidf_cos_sim': tfidf_cos_sim,
+            'tfidf1_cos_sim': tfidf1_cos_sim})
     # for art in arts:
     #     print(str.split(my_tokenizer(art)))
     return (arts, query_terms)
@@ -107,6 +111,7 @@ def find_by_id(id):
     # print(str(index_dir))
     ind_reader = DirectoryReader.open(index_dir)
     doc = ind_reader.document(id)
+    print(doc.getField('authors').stringValue() + 'test')
     article = { \
         'pmid': doc.getField('pmid').stringValue(), \
         'authors': doc.getField('authors').stringValue(), \
@@ -123,7 +128,7 @@ def calc_bm25(idf, avg_dl, doc_tf, doc_words, k = 1.5, b=0.75):
 
 
 
-def calc_tf(article):
+def calc_tf_tfa(article):
     tf = {}
     article = str.split(my_tokenizer(article))
     for word in article:
@@ -131,14 +136,20 @@ def calc_tf(article):
     for word in article:
         tf[word] = tf[word] + 1
     total = len(article)
+    max_tf = max(tf.values())
     tf = {k: v / total for k, v in tf.items()}
-    return (tf)
+    tf_a = tf.copy()
+    for k, v in tf_a.items():
+        tf_a[k] *= 0.5/max_tf
+        tf_a[k] += 0.5
+    return (tf, tf_a)
 
 
 def calc_idf(ind_searcher, hits, phrase):
     art_num = len(hits.scoreDocs)
     tokens = str.split(my_tokenizer(phrase))
     idf = {}
+    idf1 = {}
     for token in tokens:
         idf[token] = 0
     for score_doc in hits.scoreDocs:
@@ -147,8 +158,13 @@ def calc_idf(ind_searcher, hits, phrase):
             if token in article:
                 idf[token] += 1
     for token, val in idf.items():
-        idf[token] = log(art_num / val)
-    return (idf)
+        if val > 0:
+            idf[token] = log(art_num / val)
+            idf1[token] = log(1 + art_num / val)
+        else:
+            idf[token] = 0
+            idf1[token] = 0
+    return (idf, idf1)
 
 
 def calc_cosine_similarity(query, doc):
@@ -189,9 +205,11 @@ def index_articles(data_file):
             authors = ''
             if author_list is not None:
                 for author in author_list.findall('Author'):
-                    if author.find('LastName'):
-                        authors += author.find('ForeName').text + '. '
+                    if author.find('LastName') is not None:
+                        if author.find('ForeName') is not None:
+                            authors += author.find('ForeName').text + '. '
                         authors +=  author.find('LastName').text + ', '
+            print(authors)
             doc.add(TextField('authors', authors, Field.Store.YES))
             ind_wr.addDocument(doc)
     ind_wr.close()
